@@ -20,6 +20,7 @@ func main() {
 	socket := flag.String("incus-socket", "/var/lib/incus/unix.socket", "path to the local Incus unix socket")
 	imageServer := flag.String("image-server", "https://images.linuxcontainers.org", "image server for container creation")
 	groupPrefix := flag.String("tenant-group-prefix", "", "only groups with this prefix are tenants, and the project is the group name with the prefix stripped")
+	backendName := flag.String("backend", "incus", "instance backend: incus or memory (in-memory, for development without an Incus cluster)")
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
 	flag.Parse()
 
@@ -28,10 +29,19 @@ func main() {
 		os.Exit(0)
 	}
 
+	var backend Backend
+	switch *backendName {
+	case "incus":
+		backend = NewIncus(*socket, *imageServer)
+	case "memory":
+		backend = NewMemory()
+	default:
+		log.Fatalf("unknown -backend %q: use incus or memory", *backendName)
+	}
+
 	srv := &Server{
-		incus:       NewIncus(*socket),
-		authz:       NewAuthorizer(*groupPrefix),
-		imageServer: *imageServer,
+		backend: backend,
+		authz:   NewAuthorizer(*groupPrefix),
 	}
 
 	mux := http.NewServeMux()

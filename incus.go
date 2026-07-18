@@ -15,11 +15,13 @@ import (
 // All operations are fire-and-forget: an accepted async request returns nil, and
 // completion is observed through List.
 type Incus struct {
-	hc *http.Client
+	hc          *http.Client
+	imageServer string
 }
 
-func NewIncus(socket string) *Incus {
+func NewIncus(socket, imageServer string) *Incus {
 	return &Incus{
+		imageServer: imageServer,
 		hc: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
@@ -102,7 +104,17 @@ type statePut struct {
 	Force   bool   `json:"force"`
 }
 
-func (c *Incus) Create(project string, r createReq) error {
+func (c *Incus) Create(project, name, image string) error {
+	r := createReq{
+		Name: name,
+		Type: "container",
+		Source: imageSource{
+			Type:     "image",
+			Alias:    image,
+			Server:   c.imageServer,
+			Protocol: "simplestreams",
+		},
+	}
 	_, err := c.do(http.MethodPost, "/1.0/instances"+projQuery(project), r)
 	return err
 }
@@ -118,7 +130,7 @@ func (c *Incus) SetState(project, name, action string, force bool) error {
 	return err
 }
 
-func (c *Incus) List(project string) ([]instanceRecord, error) {
+func (c *Incus) List(project string) ([]containerView, error) {
 	env, err := c.do(http.MethodGet, "/1.0/instances"+projQuery(project)+"&recursion=2", nil)
 	if err != nil {
 		return nil, err
@@ -127,7 +139,19 @@ func (c *Incus) List(project string) ([]instanceRecord, error) {
 	if err := json.Unmarshal(env.Metadata, &recs); err != nil {
 		return nil, fmt.Errorf("decode instances: %w", err)
 	}
-	return recs, nil
+	out := make([]containerView, 0, len(recs))
+	for _, rec := range recs {
+		out = append(out, containerView{
+			Name:      rec.Name,
+			Status:    rec.Status,
+			Type:      rec.Type,
+			Location:  rec.Location,
+			Project:   rec.Project,
+			IPv4:      rec.ipv4(),
+			CreatedAt: rec.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return out, nil
 }
 
 // instanceRecord is the subset of a recursion=2 instance record we expose.

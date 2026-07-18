@@ -26,7 +26,8 @@ Does:
 Does not:
 
 - authenticate or authorize. The front proxy does that.
-- hold state. There is no database.
+- hold state in the Incus backend. There is no database, and Incus is the source of
+  truth. A memory backend exists for development only, see Backends.
 - exec or console.
 - wait for completion. It fires and returns, and state is read through the list.
 - configure the inside of the box, or its reachability. Keys, cloud-init and connectivity
@@ -121,6 +122,21 @@ module, its behavior is followable with curl, and there is no dependency-trackin
 There is no Incus-side endpoint to bundle the controllers behind. The only remaining
 network endpoint is the user-facing listener. For HA, run it on several controllers and
 put the user-facing listeners behind a load balancer.
+
+## Backends
+
+The handlers do not call Incus directly. They call a `Backend` interface, and that
+interface is where the implementations meet.
+
+- **Incus** is the real backend. It calls the Incus REST API over the local unix socket
+  and holds no state, since Incus is the source of truth.
+- **Memory** keeps instances in memory. It exists so a client such as the web UI can be
+  developed and demoed without an Incus cluster. It is selected with `-backend memory` and
+  is not for production.
+
+Both return the same view and the same errors, so the API contract is defined once, in the
+handlers, and cannot drift between the two. This is also the seam the handler tests mock, so
+the interface earns its place beyond the memory backend.
 
 ## The seam
 

@@ -37,6 +37,10 @@ authentication proxy such as oauth2-proxy that sets `X-Auth-Email` and `X-Auth-G
 provisioner trusts those and maps the group to an Incus project of the same name. Strip a
 prefix with `-tenant-group-prefix`.
 
+For development, or to demo a client such as a UI without an Incus cluster, run it with
+`-backend memory`. The HTTP contract is identical, but instances are kept in memory instead
+of created on Incus. This mode is not for production.
+
 ## What the incus admin sets up
 
 `project` and `profile` are the incus admin's. The provisioner only uses them and never
